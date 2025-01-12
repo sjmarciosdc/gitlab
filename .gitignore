@@ -1,6 +1,7 @@
 data/
 config/
 logs/
+backups/
 docker-compose.yml
 ngrok.yml
 env
