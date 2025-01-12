@@ -1,0 +1,17 @@
+services:
+  gitlab:
+    image: gitlab/gitlab-ce
+    container_name: gitlab
+    restart: always
+    hostname: ${ENDERECO}
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url ${ENDERECO}
+    ports:
+      - "${PORTA_HTTP}:80"
+      - "${PORTA_HTTPS}:443"
+      - "${PORTA_SSH}:22"
+    volumes:
+      - '/home/user/gitlab/config:/etc/gitlab'
+      - '/home/user/gitlab/logs:/var/log/gitlab'
+      - '/home/user/gitlab/data:/var/opt/gitlab'

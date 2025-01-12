@@ -1,0 +1,6 @@
+data/
+config/
+logs/
+docker-compose.yml
+ngrok.yml
+env
