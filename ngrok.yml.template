@@ -6,5 +6,5 @@ agent:
 tunnels:
   basic:
     proto: http
-    addr: ${PORTA_HTTP}
-    domain: ${ENDERECO}
+    addr: ${PORTA_HTTPS}
+    hostname: ${ENDERECO}

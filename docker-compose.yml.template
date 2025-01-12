@@ -3,10 +3,10 @@ services:
     image: gitlab/gitlab-ce
     container_name: gitlab
     restart: always
-    hostname: ${ENDERECO}
+    hostname: "${ENDERECO}"
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url ${ENDERECO}
+        external_url "https://${ENDERECO}"
     ports:
       - "${PORTA_HTTP}:80"
       - "${PORTA_HTTPS}:443"
