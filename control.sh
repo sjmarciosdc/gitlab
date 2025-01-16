@@ -5,16 +5,19 @@ mostrar_ajuda() {
     echo "Uso: ./control.sh [comando]"
     echo
     echo "Comandos disponíveis:"
-    echo "  backup                   - Realiza o backup dos dados"
-    echo "  clear                    - Limpa as pastas config, logs e data"
+    echo "  list-backups             - Lista os backups dentro do container GitLab"
+    echo "  copy-backup [ARQUIVO]    - Copia um backup específico do container GitLab para a pasta atual (host)"
+    echo "  push-backup [ARQUIVO]    - Envia um backup da pasta atual (host) para o container GitLab"
+    echo "  backup-gitlab            - Realiza o backup do GitLab (gitlab-backup create)"
+    echo "  restaure [ARQUIVO]       - Restaura um backup do GitLab (ex.: ./control.sh restaure 1737039975_2025_01_16_17.7.0_gitlab_backup.tar)"
     echo "  down-docker              - Para os serviços Docker"
     echo "  generate-config          - Gera os arquivos de configuração a partir de templates"
     echo "  install-ngrok-service    - Instala o serviço Ngrok usando ngrok.yml"
     echo "  logs                     - Exibe os logs do Docker"
     echo "  mudar-senha              - Reseta a senha do GitLab"
+    echo "  reconfigurar-gitlab      - Executa o reconfigure do GitLab"
     echo "  reinstall-ngrok-service  - Reinstala o serviço Ngrok"
     echo "  restart-ngrok-service    - Reinicia o serviço Ngrok"
-    echo "  restaure                 - Restaura um backup (exemplo: ./control.sh restaure <arquivo.7z>)"
     echo "  start-ngrok-service      - Inicia o serviço Ngrok"
     echo "  stop-ngrok-service       - Para o serviço Ngrok"
     echo "  uninstall-ngrok-service  - Desinstala o serviço Ngrok"
@@ -23,27 +26,90 @@ mostrar_ajuda() {
     echo
 }
 
-# Função para realizar o backup
-backup() {
-    PASTA_BACKUP="backups"
-    DATA=$(date +"%Y%m%d%H%M")
-
-    if [ ! -d "$PASTA_BACKUP" ]; then
-        mkdir -p "$PASTA_BACKUP"
-        echo "Pasta '$PASTA_BACKUP' criada."
-    fi
-
-    docker-compose down
-    sudo 7z a "${PASTA_BACKUP}/backup_${DATA}.7z" config logs data
-    echo "Backup criado em '${PASTA_BACKUP}/backup_${DATA}.7z'."
+# Função para listar os arquivos de backup dentro do container GitLab
+list_backups() {
+    echo "Listando arquivos de backup em /var/opt/gitlab/backups do container 'gitlab':"
+    docker-compose exec gitlab ls -lh /var/opt/gitlab/backups
 }
 
-# Função para limpar pastas
-clear() {
-    rm -rf config
-    rm -rf logs
-    rm -rf data
-    echo "Pastas 'config', 'logs' e 'data' foram removidas."
+# Função para copiar um backup específico do container para a pasta atual
+copy_backup() {
+    local BACKUP_FILE="$1"
+    if [ -z "$BACKUP_FILE" ]; then
+        echo "Erro: informe o nome do arquivo de backup."
+        echo "Exemplo: ./control.sh copy-backup 1737039975_2025_01_16_17.7.0_gitlab_backup.tar"
+        exit 1
+    fi
+
+    echo "Copiando '$BACKUP_FILE' do container GitLab para a pasta atual (host)..."
+    docker cp "gitlab:/var/opt/gitlab/backups/$BACKUP_FILE" .
+    echo "Cópia concluída: $BACKUP_FILE"
+}
+
+# Função para enviar (push) um backup do diretório atual para o container
+push_backup() {
+    local BACKUP_FILE="$1"
+    if [ -z "$BACKUP_FILE" ]; then
+        echo "Erro: informe o nome do arquivo de backup a enviar."
+        echo "Exemplo: ./control.sh push-backup 1737039975_2025_01_16_17.7.0_gitlab_backup.tar"
+        exit 1
+    fi
+
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Erro: o arquivo '$BACKUP_FILE' não existe no diretório atual."
+        exit 1
+    fi
+
+    echo "Enviando '$BACKUP_FILE' do diretório atual para /var/opt/gitlab/backups no container GitLab..."
+    docker cp "$BACKUP_FILE" "gitlab:/var/opt/gitlab/backups/"
+    echo "Arquivo '$BACKUP_FILE' copiado com sucesso para dentro do container."
+}
+
+# Função para realizar o backup nativo do GitLab
+backup_gitlab() {
+    docker-compose exec gitlab gitlab-backup create
+    echo "Backup do GitLab criado com sucesso."
+}
+
+# Função para restaurar um backup do GitLab
+restaure() {
+    if [ -z "$1" ]; then
+        echo "Erro: informe o nome do arquivo de backup completo."
+        echo "Exemplo: ./control.sh restaure 1737039975_2025_01_16_17.7.0_gitlab_backup.tar"
+        exit 1
+    fi
+
+    local BACKUP_FILE="$1"
+
+    # Verifica se o arquivo existe no diretório atual
+    if [ ! -f "$BACKUP_FILE" ]; then
+        echo "Erro: o arquivo '$BACKUP_FILE' não existe no diretório atual."
+        exit 1
+    fi
+
+    echo "Copiando '$BACKUP_FILE' para dentro do container GitLab..."
+    docker cp "$BACKUP_FILE" gitlab:/var/opt/gitlab/backups/
+
+    # Extrai o timestamp (tudo antes do primeiro underscore)
+    local TIMESTAMP
+    TIMESTAMP=$(echo "$BACKUP_FILE" | cut -d_ -f1)
+
+    echo "Parando serviços Puma e Sidekiq no GitLab..."
+    docker-compose exec gitlab gitlab-ctl stop puma
+    docker-compose exec gitlab gitlab-ctl stop sidekiq
+
+    echo "Ajustando permissões do arquivo de backup dentro do container..."
+    docker-compose exec gitlab chown git:git "/var/opt/gitlab/backups/$BACKUP_FILE"
+
+    echo "Iniciando restauração do backup: $BACKUP_FILE"
+    # '-T' evita problemas de alocação de pseudoTTY, permitindo interação de confirmação
+    docker-compose exec -T gitlab bash -c "gitlab-backup restore BACKUP=$TIMESTAMP"
+
+    echo "Reconfigurando e reiniciando serviços do GitLab..."
+    docker-compose exec gitlab gitlab-ctl reconfigure
+    docker-compose exec gitlab gitlab-ctl start
+
+    echo "Backup '$BACKUP_FILE' restaurado com sucesso!"
 }
 
 # Função para parar os serviços Docker
@@ -81,6 +147,12 @@ mudar_senha() {
     echo "Senha do GitLab resetada."
 }
 
+# Função para reconfigurar o GitLab
+reconfigurar_gitlab() {
+    docker-compose exec gitlab gitlab-ctl reconfigure
+    echo "GitLab reconfigurado."
+}
+
 # Função para reinstalar o serviço Ngrok
 reinstall_ngrok_service() {
     sudo ngrok service uninstall
@@ -93,16 +165,6 @@ reinstall_ngrok_service() {
 restart_ngrok_service() {
     sudo ngrok service restart
     echo "Serviço Ngrok reiniciado."
-}
-
-# Função para restaurar um backup
-restaure() {
-    if [ -z "$1" ]; then
-        echo "Erro: Informe o arquivo de backup a ser restaurado. Exemplo: ./control.sh restaure backup.7z"
-    else
-        7z x "$1"
-        echo "Backup '$1' restaurado."
-    fi
 }
 
 # Função para iniciar o serviço Ngrok
@@ -125,18 +187,30 @@ uninstall_ngrok_service() {
 
 # Função para iniciar os serviços Docker
 up_docker() {
-    mkdir -p config logs data
+    # Removida a criação automática das pastas config, logs e data
     docker-compose up -d
     echo "Docker iniciado."
 }
 
 # Verifica o comando passado
 case $1 in
-    backup)
-        backup
+    list-backups)
+        list_backups
         ;;
-    clear)
-        clear
+    copy-backup)
+        shift
+        copy_backup "$@"
+        ;;
+    push-backup)
+        shift
+        push_backup "$@"
+        ;;
+    backup-gitlab)
+        backup_gitlab
+        ;;
+    restaure)
+        shift
+        restaure "$@"
         ;;
     down-docker)
         down_docker
@@ -153,15 +227,14 @@ case $1 in
     mudar-senha)
         mudar_senha
         ;;
+    reconfigurar-gitlab)
+        reconfigurar_gitlab
+        ;;
     reinstall-ngrok-service)
         reinstall_ngrok_service
         ;;
     restart-ngrok-service)
         restart_ngrok_service
-        ;;
-    restaure)
-        shift
-        restaure "$@"
         ;;
     start-ngrok-service)
         start_ngrok_service
