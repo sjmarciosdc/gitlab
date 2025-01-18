@@ -14,7 +14,7 @@ Este repositório contém scripts e arquivos de configuração para executar uma
   Template do arquivo `docker-compose.yml`. Nele, algumas variáveis são referenciadas para que sejam substituídas pelos valores do arquivo `env`.
 
 - **`docker-compose.yml`**  
-  Gerado automaticamente a partir do template e das variáveis definidas em `env`. É o arquivo efetivamente utilizado pelo Docker-Compose para subir os serviços.
+  Gerado automaticamente a partir do template e das variáveis definidas em `env`. É o arquivo efetivamente utilizado pelo Docker Compose para subir os serviços.
 
 - **`ngrok.yml.template`**  
   Template do arquivo `ngrok.yml`. Também contém variáveis que serão substituídas pelos valores do arquivo `env`.
@@ -30,6 +30,7 @@ Este repositório contém scripts e arquivos de configuração para executar uma
   - Instalar, desinstalar e gerenciar o serviço Ngrok.
   - Gerar arquivos de configuração a partir de templates.
   - Resetar senha do GitLab, reconfigurar e exibir logs.
+  - **Remover os volumes declarados no `docker-compose.yml` (comando `reset`).**
   
   O `control.sh` aceita parâmetros que correspondem aos comandos descritos na seção [4. Comandos disponíveis no `control.sh`](#4-comandos-dispon%C3%ADveis-no-controlsh).
 
@@ -212,7 +213,14 @@ Para ver o menu de ajuda. Abaixo uma breve descrição de cada comando:
     ./control.sh up-docker
     ```
 
-18. **`help`**  
+18. **`reset`**  
+    - Remove todos os volumes listados no `docker-compose.yml` (equivalente a `docker-compose down -v`).  
+    **Atenção**: Este comando **exclui** permanentemente todos os dados armazenados nos volumes.
+    ```bash
+    ./control.sh reset
+    ```
+
+19. **`help`**  
     - Mostra o menu de ajuda do script.
     ```bash
     ./control.sh help
@@ -250,6 +258,13 @@ Para ver o menu de ajuda. Abaixo uma breve descrição de cada comando:
 ./control.sh up-docker
 ```
 
+### Remover Todos os Volumes (Reset)
+
+```bash
+# Remove todos os volumes listados no docker-compose.yml (destrutivo!)
+./control.sh reset
+```
+
 ### Gerenciar Ngrok
 
 ```bash
@@ -267,6 +282,7 @@ Para ver o menu de ajuda. Abaixo uma breve descrição de cada comando:
 - Se estiver enfrentando problemas de permissão com Docker, verifique se seu usuário está no grupo `docker` ou use `sudo`.
 - Sempre atualize o arquivo `env` e gere novamente os arquivos de configuração quando houver mudança de domínio, token do Ngrok ou outras variáveis importantes.
 - Os scripts foram testados em ambientes Linux. Em outros sistemas operacionais, pode ser necessário adaptar comandos ou permissões.
+- **O comando `reset` remove dados de maneira irreversível**. Use-o apenas se estiver ciente de que todo o conteúdo dos volumes Docker será perdido.
 
 ---
 
