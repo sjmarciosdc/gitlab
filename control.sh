@@ -9,7 +9,7 @@ mostrar_ajuda() {
     echo "  copy-backup [ARQUIVO]    - Copia um backup específico do container GitLab para a pasta atual (host)"
     echo "  push-backup [ARQUIVO]    - Envia um backup da pasta atual (host) para o container GitLab"
     echo "  backup-gitlab            - Realiza o backup do GitLab (gitlab-backup create)"
-    echo "  restaure [ARQUIVO]       - Restaura um backup do GitLab (ex.: ./control.sh restaure 1737039975_2025_01_16_17.7.0_gitlab_backup.tar)"
+    echo "  restaure [ARQUIVO]       - Restaura um backup do GitLab"
     echo "  down-docker              - Para os serviços Docker"
     echo "  generate-config          - Gera os arquivos de configuração a partir de templates"
     echo "  install-ngrok-service    - Instala o serviço Ngrok usando ngrok.yml"
@@ -22,6 +22,7 @@ mostrar_ajuda() {
     echo "  stop-ngrok-service       - Para o serviço Ngrok"
     echo "  uninstall-ngrok-service  - Desinstala o serviço Ngrok"
     echo "  up-docker                - Inicia os serviços Docker"
+    echo "  reset                    - Remove todos os volumes listados no docker-compose.yml"
     echo "  help                     - Mostra este menu de ajuda"
     echo
 }
@@ -102,7 +103,6 @@ restaure() {
     docker-compose exec gitlab chown git:git "/var/opt/gitlab/backups/$BACKUP_FILE"
 
     echo "Iniciando restauração do backup: $BACKUP_FILE"
-    # '-T' evita problemas de alocação de pseudoTTY, permitindo interação de confirmação
     docker-compose exec -T gitlab bash -c "gitlab-backup restore BACKUP=$TIMESTAMP"
 
     echo "Reconfigurando e reiniciando serviços do GitLab..."
@@ -192,6 +192,13 @@ up_docker() {
     echo "Docker iniciado."
 }
 
+# Função para remover todos os volumes definidos no docker-compose (reset)
+reset_volumes() {
+    echo "Removendo todos os volumes listados no docker-compose.yml..."
+    docker-compose down -v
+    echo "Volumes removidos com sucesso."
+}
+
 # Verifica o comando passado
 case $1 in
     list-backups)
@@ -247,6 +254,9 @@ case $1 in
         ;;
     up-docker)
         up_docker
+        ;;
+    reset)
+        reset_volumes
         ;;
     help | *)
         mostrar_ajuda

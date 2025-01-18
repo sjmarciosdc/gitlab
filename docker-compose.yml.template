@@ -11,3 +11,13 @@ services:
       - "${PORTA_HTTP}:80"
       - "${PORTA_HTTPS}:443"
       - "${PORTA_SSH}:22"
+    volumes:
+      - 'config:/etc/gitlab'
+      - 'logs:/var/log/gitlab'
+      - 'data:/var/opt/gitlab'
+
+volumes:
+  config:
+  logs:
+  data:
+
